@@ -1,6 +1,6 @@
 import { Spinner } from "@fluentui/react-components";
 
-const SkypointLogoLoader = () => {
+const FullPageLoader = () => {
   return (
     <div className="flex min-h-screen flex-col items-center justify-between px-8 py-12 text-center text-gray-200">
       <div className="flex flex-col items-center gap-3">
@@ -26,4 +26,4 @@ const SkypointLogoLoader = () => {
   );
 };
 
-export default SkypointLogoLoader;
+export default FullPageLoader;

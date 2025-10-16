@@ -1,17 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { FluentProvider } from "@fluentui/react-components";
 import { createStudioTheme, setColors } from "./theme/studioTheme";
-
-import { routeTree } from "./routeTree.gen";
-const router = createRouter({ routeTree });
-declare module "@tanstack/react-router" {
-  interface Register {
-    router: typeof router;
-  }
-}
+import App from "./App";
 
 const studioTheme = createStudioTheme();
 
@@ -23,7 +15,7 @@ if (!rootElement.innerHTML) {
   root.render(
     <StrictMode>
       <FluentProvider theme={studioTheme}>
-        <RouterProvider router={router} />
+        <App />
       </FluentProvider>
     </StrictMode>
   );
