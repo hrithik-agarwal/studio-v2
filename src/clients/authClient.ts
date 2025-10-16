@@ -4,9 +4,10 @@ import store from "@/store/store";
 import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { signoutAction } from "@/store/auth/authActions";
 import { msalInstance, authConfig, loginRequest } from "@/config/msalConfig";
+import { getAuthState } from "@/store/authStore";
+import { logger } from "@/utils/logger";
 
 class Auth {
-  // Use the centralized MSAL instance
   get msalClient() {
     return msalInstance;
   }
@@ -37,7 +38,10 @@ class Auth {
   };
 
   async login() {
+    logger.info('Login initiated');
+
     try {
+      logger.debug('Handling redirect promise...');
       let tokenResponse = await this.msalClient.handleRedirectPromise();
 
       const accountObj = tokenResponse
@@ -45,72 +49,97 @@ class Auth {
         : this.msalClient.getAllAccounts()[0];
 
       if (accountObj) {
+        logger.debug('Account found', { accountId: accountObj.homeAccountId });
+
         if (
           !accountObj.homeAccountId.includes(
             authConfig.policies.signin.toLowerCase()
           )
         ) {
+          logger.warn('Account policy mismatch, logging out and redirecting');
           await this.msalClient.logout();
           await this.msalClient.loginRedirect(loginRequest);
-          window.isAuthenticated = true;
+          getAuthState().setAuthenticated(true);
         }
       }
 
       if (accountObj && tokenResponse) {
-        window.accessToken = tokenResponse.accessToken;
-        window.idTokenClaims = tokenResponse.idTokenClaims;
-        window.isAuthenticated = true;
+        logger.info('Login successful with token response', {
+          hasAccessToken: !!tokenResponse.accessToken,
+          accountName: accountObj.name,
+        });
+
+        getAuthState().setAuthData({
+          isAuthenticated: true,
+          accessToken: tokenResponse.accessToken,
+          idTokenClaims: tokenResponse.idTokenClaims,
+        });
         return { account: accountObj, accessToken: tokenResponse.accessToken };
       } else if (accountObj) {
+        logger.debug('Account exists but no token response, acquiring token silently');
         try {
           tokenResponse = await this.msalClient.acquireTokenSilent({
             account: this.msalClient.getAllAccounts()[0],
             scopes: authConfig.scopes,
           });
-          window.isAuthenticated = true;
+          logger.info('Token acquired silently');
+          getAuthState().setAuthenticated(true);
         } catch (err) {
+          logger.warn('Silent token acquisition failed', err);
           if (err instanceof InteractionRequiredAuthError) {
+            logger.info('Redirecting for interactive authentication');
             await this.msalClient.acquireTokenRedirect({
               scopes: authConfig.scopes,
             });
-            window.isAuthenticated = true;
+            getAuthState().setAuthenticated(true);
           }
         }
       } else {
         if (this.loginInProgress()) {
+          logger.debug('Login already in progress');
           return {};
         }
 
+        logger.info('No account found, redirecting to login');
         await this.msalClient.loginRedirect(loginRequest);
-        window.isAuthenticated = true;
+        getAuthState().setAuthenticated(true);
       }
 
       if (tokenResponse) {
-        window.accessToken = tokenResponse.accessToken;
-        window.idTokenClaims = tokenResponse.idTokenClaims;
-        window.isAuthenticated = true;
+        logger.info('Authentication completed successfully');
+        getAuthState().setAuthData({
+          isAuthenticated: true,
+          accessToken: tokenResponse.accessToken,
+          idTokenClaims: tokenResponse.idTokenClaims,
+        });
         return { account: accountObj, accessToken: tokenResponse.accessToken };
       }
 
+      logger.warn('Login completed without token response');
       return { error: "unknown error" };
-    } catch (error) {
-      console.error(error);
+    } catch (error: unknown) {
+      logger.error('Login error', error);
+
+      // Type guard for MSAL errors with errorMessage property
+      const err = error as { errorMessage?: string };
 
       if (
-        error.errorMessage &&
-        error.errorMessage.indexOf("AADB2C90091") > -1
+        err.errorMessage &&
+        err.errorMessage.indexOf("AADB2C90091") > -1
       ) {
         // user cancels the flow
+        logger.warn('User cancelled the authentication flow (AADB2C90091)');
         await this.msalClient.logout();
         store.dispatch(signoutAction());
         await this.msalClient.loginRedirect(loginRequest);
-        window.isAuthenticated = true;
+        getAuthState().setAuthenticated(true);
       }
 
       if (
-        error.errorMessage &&
-        error.errorMessage.indexOf("AADB2C90118") > -1
+        err.errorMessage &&
+        err.errorMessage.indexOf("AADB2C90118") > -1
       ) {
+        logger.info('Password reset requested (AADB2C90118)');
         try {
           // Password reset policy/authority
           await this.msalClient.loginRedirect({
@@ -120,9 +149,9 @@ class Auth {
               authConfig.policies.resetpassword
             ),
           });
-          window.isAuthenticated = true;
+          getAuthState().setAuthenticated(true);
         } catch (err) {
-          console.error(err);
+          logger.error('Password reset redirect failed', err);
         }
       }
 
@@ -131,46 +160,60 @@ class Auth {
   }
 
   async getAccessToken(scopes = null) {
-    //if (window.accessToken) {
-    //    return window.accessToken;
-    //}
+    logger.debug('Getting access token', { customScopes: !!scopes });
+
+    // Check if we already have an access token in store
+    const authState = getAuthState();
+    if (authState.accessToken) {
+      logger.debug('Returning cached access token from store');
+      return authState.accessToken;
+    }
 
     try {
       const accounts = this.msalClient.getAllAccounts();
+      logger.debug('Attempting to get token', { accountsCount: accounts.length });
+
       let tokenResponse = await this.msalClient.handleRedirectPromise();
       if (!tokenResponse) {
         try {
+          logger.debug('Acquiring token silently');
           tokenResponse = await this.msalClient.acquireTokenSilent({
             account: accounts[0],
             scopes: scopes ? scopes : authConfig.scopes,
           });
-          window.isAuthenticated = true;
+          logger.info('Token acquired silently');
+          getAuthState().setAuthenticated(true);
         } catch (error) {
-          console.error(error);
+          logger.warn('Silent token acquisition failed', error);
 
           if (error instanceof InteractionRequiredAuthError) {
+            logger.info('Interaction required, redirecting for token acquisition');
             await this.msalClient.acquireTokenRedirect({
               account: accounts[0],
               scopes: scopes ? scopes : authConfig.scopes,
             });
-            window.isAuthenticated = true;
+            getAuthState().setAuthenticated(true);
           }
         }
       }
 
       if (tokenResponse) {
-        window.idTokenClaims = tokenResponse.idTokenClaims;
-        window.accessToken = tokenResponse.accessToken;
-        window.isAuthenticated = true;
+        logger.info('Access token retrieved successfully');
+        getAuthState().setAuthData({
+          isAuthenticated: true,
+          accessToken: tokenResponse.accessToken,
+          idTokenClaims: tokenResponse.idTokenClaims,
+        });
         return tokenResponse.accessToken;
       }
     } catch (error) {
-      console.error(error);
+      logger.error('Failed to get access token', error);
       return { error: error };
     }
   }
 
-  googleLogin(planId, token) {
+  googleLogin(planId: string, token: string) {
+    logger.info('Google login initiated', { planId });
     auth.msalClient.loginRedirect({
       scopes: authConfig.scopes,
       authority: authConfig.instance
@@ -187,7 +230,8 @@ class Auth {
     });
   }
 
-  azureLogin(planId, token) {
+  azureLogin(planId: string, token: string) {
+    logger.info('Azure AD login initiated', { planId });
     auth.msalClient.loginRedirect({
       scopes: authConfig.scopes,
       authority: authConfig.instance
@@ -204,18 +248,21 @@ class Auth {
     });
   }
 
-  googleSignup = (planId, token) => {
+  googleSignup = (planId: string, token: string) => {
+    logger.info('Google signup initiated', { planId });
     sessionStorage.clear();
     auth.googleLogin(planId, token);
   };
 
-  azureSignup = (planId, token) => {
+  azureSignup = (planId: string, token: string) => {
+    logger.info('Azure AD signup initiated', { planId });
     sessionStorage.clear();
     auth.azureLogin(planId, token);
   };
 
   logout() {
-    window.isAuthenticated = false;
+    logger.info('Logout initiated');
+    getAuthState().clearAuth();
     try {
       store.dispatch(signoutAction());
       fetch(import.meta.env.VITE_API_BASE_URL + "/api/user/logout", {
@@ -224,60 +271,66 @@ class Auth {
       })
         .then(errorHandler)
         .then(function () {
+          logger.info('Server logout successful, clearing local state');
           auth.msalClient.logout().then(() => {
-            console.log("user logged out");
+            logger.info('MSAL logout complete');
             localStorage.clear();
-            window.idTokenClaims = undefined;
-            window.accessToken = undefined;
+            getAuthState().clearAuth();
           });
+        })
+        .catch((error) => {
+          logger.error('Logout failed', error);
         });
     } catch (error) {
-      console.error(error);
+      logger.error('Logout error', error);
     }
   }
 
   getMultiPartAuthorizationHeader() {
-    var accessToken = window.accessToken;
-    var instanceId;
+    const accessToken = getAuthState().accessToken;
+    let instanceId: string | undefined;
     if (window.location && window.location.search) {
       const values = queryString.parse(window.location.search);
-      instanceId = values.instanceid;
+      instanceId =
+        typeof values.instanceid === "string" ? values.instanceid : undefined;
     }
 
     return new Headers({
       Authorization: `Bearer ${accessToken}`,
-      InstanceId: instanceId,
+      ...(instanceId && { InstanceId: instanceId }),
     });
   }
 
   getAuthorizationHeader() {
-    var accessToken = window.accessToken; //this.getAccessToken();
-    var instanceId;
+    const accessToken = getAuthState().accessToken;
+    let instanceId: string | undefined;
     if (window.location && window.location.search) {
       const values = queryString.parse(window.location.search);
-      instanceId = values.instanceid;
+      instanceId =
+        typeof values.instanceid === "string" ? values.instanceid : undefined;
     }
 
     return new Headers({
       Accept: "application/json",
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
-      InstanceId: instanceId,
+      ...(instanceId && { InstanceId: instanceId }),
     });
   }
   getHeader() {
-    const accessToken = window.accessToken; //this.getAccessToken();
-    let instanceId;
+    const accessToken = getAuthState().accessToken;
+    let instanceId: string | undefined;
     if (window.location && window.location.search) {
       const values = queryString.parse(window.location.search);
-      instanceId = values.instanceid;
+      instanceId =
+        typeof values.instanceid === "string" ? values.instanceid : undefined;
     }
 
     return {
       Accept: "application/json",
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
-      InstanceId: instanceId,
+      ...(instanceId && { InstanceId: instanceId }),
     };
   }
 
@@ -294,27 +347,32 @@ class Auth {
   }
 
   getHeaderWithToken() {
-    var currentUser = this.currentUser();
-    var accessToken = window.accessToken; //this.getAccessToken();
-    var instanceId;
+    const accessToken = getAuthState().accessToken;
+    let instanceId: string | undefined;
     if (window.location && window.location.search) {
       const values = queryString.parse(window.location.search);
-      instanceId = values.instanceid;
+      instanceId =
+        typeof values.instanceid === "string" ? values.instanceid : undefined;
     }
     return new Headers({
       Authorization: `Bearer ${accessToken}`,
-      InstanceId: instanceId,
+      ...(instanceId && { InstanceId: instanceId }),
     });
   }
 
   currentUser() {
+    logger.debug('Getting current user');
     const accounts = this.msalClient.getAllAccounts();
 
     if (accounts && accounts.length > 0) {
-      var account = accounts[0];
+      const account = accounts[0];
 
-      var idToken = window.idTokenClaims;
+      const idToken = getAuthState().idTokenClaims;
       if (idToken) {
+        logger.debug('Current user retrieved from idToken', {
+          name: idToken.name,
+          email: idToken.email
+        });
         return {
           name: idToken.name,
           firstName: idToken.given_name,
@@ -329,11 +387,18 @@ class Auth {
         };
       }
 
+      logger.debug('Current user retrieved from account', {
+        name: account.name,
+        id: account.localAccountId
+      });
       return {
         name: account.name,
-        id: account.homeAccountId,
+        id: account.localAccountId,
       };
     }
+
+    logger.warn('No current user found');
+    return undefined;
   }
 }
 export const auth = new Auth();
