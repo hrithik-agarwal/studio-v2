@@ -1,10 +1,11 @@
-import { useState, useEffect, type ReactNode, type ReactElement } from "react";
+import { useState, useEffect, } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { auth } from "./clients/Auth";
+import { auth } from "./clients/authClient";
 import type { IUserExistsResponse } from "@/store/appStore";
-import { ROUTES } from "./libs/contants";
+import { ROUTES } from "./libs/constants";
 import PrimaryButton from "./components/PrimaryButton";
 import FullPageLoader from "./components/FullPageLoader";
+import MessageBlock from "./components/MessageBlock";
 
 // TODO: Import these components once they are created
 // import { Signup } from "@/features/auth/components/Signup";
@@ -19,15 +20,11 @@ const Signup = () => <div>Signup Page</div>;
 const VerifyEmail = () => <div>Verify Email Page</div>;
 const SkyPointLogin = () => <div>SkyPoint Login Page</div>;
 const SkypointSignUp = () => <div>Skypoint SignUp Page</div>;
-
-// Placeholder for missing components
 const AccountLocked = () => <div>🔒</div>;
 const Callback = () => <div>Callback Page</div>;
 const AppNew = () => <div>App New</div>;
 
-// Placeholder constants
 
-// Initialize auth with Vite environment variables
 auth.initialize({
   instance: import.meta.env.VITE_B2C_CONFIG_INSTANCE,
   tenant: import.meta.env.VITE_B2C_CONFIG_TENANT,
@@ -43,31 +40,6 @@ const Styles = {
   needHelpButton: {},
 };
 
-interface AuthRenderProps {
-  state: string;
-  account: Record<string, unknown>;
-}
-
-interface AuthProviderProps {
-  msalClient: Record<string, unknown>;
-  render: (props: AuthRenderProps) => ReactElement;
-}
-
-const AuthProvider = ({ render }: AuthProviderProps) =>
-  render({ state: "Success", account: {} });
-const AuthProviderState = { Success: "Success" };
-
-interface MessageBlockProps {
-  children: ReactNode;
-}
-
-const MessageBlock = (props: MessageBlockProps) => {
-  return (
-    <div className="center-div">
-      <div className="text-center">{props.children}</div>
-    </div>
-  );
-};
 
 const getUser = async (): Promise<IUserExistsResponse> => {
   const user = auth.currentUser();

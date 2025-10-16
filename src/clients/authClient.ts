@@ -1,6 +1,6 @@
 // @ts-nocheck
 // TODO: Fix TypeScript errors in this file - add proper types for Auth class
-import { errorHandler } from "./errorhandler";
+import { errorHandler } from "./errorHandler";
 import queryString from "query-string";
 import store from "@/store/store";
 import {
@@ -178,7 +178,7 @@ class Auth {
     }
   }
 
-  async getAccessToken(scopes) {
+  async getAccessToken(scopes = null) {
     //if (window.accessToken) {
     //    return window.accessToken;
     //}

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { devtools, persist, createJSONStorage } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { auth } from '../clients/Auth'
+import { auth } from '../clients/authClient'
 
 export interface IUserExistsResponse {
   isSuccessful: boolean
