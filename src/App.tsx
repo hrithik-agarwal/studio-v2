@@ -1,19 +1,20 @@
-import { useState, useEffect, } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { MsalProvider } from "@azure/msal-react";
+import { msalInstance } from "./config/msalConfig";
 import { auth } from "./clients/authClient";
 import type { IUserExistsResponse } from "@/store/appStore";
 import { ROUTES } from "./libs/constants";
 import PrimaryButton from "./components/PrimaryButton";
 import FullPageLoader from "./components/FullPageLoader";
 import MessageBlock from "./components/MessageBlock";
+import { AuthProvider, AuthProviderState } from "./providers";
 
 // TODO: Import these components once they are created
 // import { Signup } from "@/features/auth/components/Signup";
 // import { VerifyEmail } from "@/features/auth/components/VerifyEmail";
 // import { SkyPointLogin } from "@/features/auth/components/SkyPointLogin";
 // import { SkypointSignUp } from "@/features/auth/components/SkypointSignUp";
-// import { AuthProvider } from "@/features/auth/components/AuthProvider";
-// import { AuthProviderState } from "@/features/auth/types";
 
 // Placeholder components until the actual components are created
 const Signup = () => <div>Signup Page</div>;
@@ -25,16 +26,7 @@ const Callback = () => <div>Callback Page</div>;
 const AppNew = () => <div>App New</div>;
 
 
-auth.initialize({
-  instance: import.meta.env.VITE_B2C_CONFIG_INSTANCE,
-  tenant: import.meta.env.VITE_B2C_CONFIG_TENANT,
-  clientId: import.meta.env.VITE_B2C_CONFIG_CLIENT_ID,
-  cacheLocation: import.meta.env.VITE_B2C_CONFIG_CACHE_LOCATION,
-  scopes: JSON.parse(import.meta.env.VITE_B2C_CONFIG_SCOPES || "[]"),
-  policies: JSON.parse(import.meta.env.VITE_B2C_CONFIG_POLICIES || "{}"),
-  redirectUri: import.meta.env.VITE_B2C_CONFIG_REDIRECT_URL,
-  postLogoutRedirectUri: window.location.href,
-});
+// MSAL instance is now initialized in msalConfig.ts
 
 const Styles = {
   needHelpButton: {},
@@ -165,16 +157,17 @@ const App = () => {
     );
   } else {
     return (
-      <AuthProvider
-        msalClient={auth.msalClient || {}}
-        render={({ state }) =>
-          state === AuthProviderState.Success ? (
-            <ApplicationBlock />
-          ) : (
-            <FullPageLoader />
-          )
-        }
-      />
+      <MsalProvider instance={msalInstance}>
+        <AuthProvider
+          render={({ state }: { state: typeof AuthProviderState[keyof typeof AuthProviderState] }) =>
+            state === AuthProviderState.Success ? (
+              <ApplicationBlock />
+            ) : (
+              <FullPageLoader />
+            )
+          }
+        />
+      </MsalProvider>
     );
   }
 };

@@ -1,21 +1,23 @@
-// @ts-nocheck
-// TODO: Fix TypeScript errors in this file - add proper types for Auth class
-import { errorHandler } from "./errorHandler";
+import { errorHandler } from "./errorhandler";
 import queryString from "query-string";
 import store from "@/store/store";
-import {
-  PublicClientApplication,
-  LogLevel,
-  InteractionRequiredAuthError,
-} from "@azure/msal-browser";
+import { InteractionRequiredAuthError } from "@azure/msal-browser";
 import { signoutAction } from "@/store/auth/authActions";
-
-const defaultScopes = ["openid"];
+import { msalInstance, authConfig, loginRequest } from "@/config/msalConfig";
 
 class Auth {
-  options = {};
-  msalClient = null;
-  loginScopes = [];
+  // Use the centralized MSAL instance
+  get msalClient() {
+    return msalInstance;
+  }
+
+  get options() {
+    return authConfig;
+  }
+
+  get loginScopes() {
+    return loginRequest.scopes;
+  }
 
   isLoggedIn() {
     const accounts = this.msalClient.getAllAccounts();
@@ -29,61 +31,10 @@ class Auth {
   loginInProgress = () => {
     return (
       sessionStorage.getItem(
-        `msal.${this.options.clientId}.interaction.status`
+        `msal.${authConfig.clientId}.interaction.status`
       ) == "interaction_in_progress"
     );
   };
-
-  initialize(options) {
-    this.options = options;
-
-    this.loginScopes = this.options.scopes
-      .concat(defaultScopes)
-      .filter((value, index, self) => {
-        return self.indexOf(value) === index;
-      });
-
-    const config = {
-      auth: {
-        authority: this.options.instance,
-        clientId: this.options.clientId,
-        redirectUri: this.options.redirectUri,
-        knownAuthorities: Object.values(options.policies).map((x) => {
-          return this.options.instance.replace(auth.options.policies.signin, x);
-        }),
-        navigateToLoginRequestUrl: false,
-        postLogoutRedirectUri: this.options.postLogoutRedirectUri,
-      },
-      cache: {
-        cacheLocation: this.options.cacheLocation,
-      },
-      system: {
-        loggerOptions: {
-          loggerCallback: (level, message, containsPii) => {
-            if (containsPii) {
-              return;
-            }
-            switch (level) {
-              case LogLevel.Error:
-                console.error(message);
-                return;
-              case LogLevel.Info:
-                console.info(message);
-                return;
-              case LogLevel.Verbose:
-                console.debug(message);
-                return;
-              case LogLevel.Warning:
-                console.warn(message);
-                return;
-            }
-          },
-        },
-      },
-    };
-
-    this.msalClient = new PublicClientApplication(config);
-  }
 
   async login() {
     try {
@@ -96,11 +47,11 @@ class Auth {
       if (accountObj) {
         if (
           !accountObj.homeAccountId.includes(
-            auth.options.policies.signin.toLowerCase()
+            authConfig.policies.signin.toLowerCase()
           )
         ) {
-          await auth.msalClient.logout();
-          await this.msalClient.loginRedirect({ scopes: this.loginScopes });
+          await this.msalClient.logout();
+          await this.msalClient.loginRedirect(loginRequest);
           window.isAuthenticated = true;
         }
       }
@@ -114,13 +65,13 @@ class Auth {
         try {
           tokenResponse = await this.msalClient.acquireTokenSilent({
             account: this.msalClient.getAllAccounts()[0],
-            scopes: this.options.scopes,
+            scopes: authConfig.scopes,
           });
           window.isAuthenticated = true;
         } catch (err) {
           if (err instanceof InteractionRequiredAuthError) {
             await this.msalClient.acquireTokenRedirect({
-              scopes: this.options.scopes,
+              scopes: authConfig.scopes,
             });
             window.isAuthenticated = true;
           }
@@ -130,7 +81,7 @@ class Auth {
           return {};
         }
 
-        await this.msalClient.loginRedirect({ scopes: this.loginScopes });
+        await this.msalClient.loginRedirect(loginRequest);
         window.isAuthenticated = true;
       }
 
@@ -152,7 +103,7 @@ class Auth {
         // user cancels the flow
         await this.msalClient.logout();
         store.dispatch(signoutAction());
-        await this.msalClient.loginRedirect({ scopes: this.loginScopes });
+        await this.msalClient.loginRedirect(loginRequest);
         window.isAuthenticated = true;
       }
 
@@ -163,9 +114,10 @@ class Auth {
         try {
           // Password reset policy/authority
           await this.msalClient.loginRedirect({
-            authority: this.options.instance.replace(
-              this.options.policies.signin,
-              this.options.policies.resetpassword
+            scopes: authConfig.scopes,
+            authority: authConfig.instance.replace(
+              authConfig.policies.signin,
+              authConfig.policies.resetpassword
             ),
           });
           window.isAuthenticated = true;
@@ -190,7 +142,7 @@ class Auth {
         try {
           tokenResponse = await this.msalClient.acquireTokenSilent({
             account: accounts[0],
-            scopes: scopes ? scopes : this.options.scopes,
+            scopes: scopes ? scopes : authConfig.scopes,
           });
           window.isAuthenticated = true;
         } catch (error) {
@@ -199,7 +151,7 @@ class Auth {
           if (error instanceof InteractionRequiredAuthError) {
             await this.msalClient.acquireTokenRedirect({
               account: accounts[0],
-              scopes: scopes ? scopes : this.options.scopes,
+              scopes: scopes ? scopes : authConfig.scopes,
             });
             window.isAuthenticated = true;
           }
@@ -220,11 +172,12 @@ class Auth {
 
   googleLogin(planId, token) {
     auth.msalClient.loginRedirect({
-      authority: auth.options.instance
+      scopes: authConfig.scopes,
+      authority: authConfig.instance
         .toLowerCase()
         .replace(
-          auth.options.policies.signin.toLowerCase(),
-          auth.options.policies.newtenant.toLowerCase()
+          authConfig.policies.signin.toLowerCase(),
+          authConfig.policies.newtenant.toLowerCase()
         ),
       extraQueryParameters: {
         domain_hint: "google.com",
@@ -236,11 +189,12 @@ class Auth {
 
   azureLogin(planId, token) {
     auth.msalClient.loginRedirect({
-      authority: auth.options.instance
+      scopes: authConfig.scopes,
+      authority: authConfig.instance
         .toLowerCase()
         .replace(
-          auth.options.policies.signin.toLowerCase(),
-          auth.options.policies.newtenant.toLowerCase()
+          authConfig.policies.signin.toLowerCase(),
+          authConfig.policies.newtenant.toLowerCase()
         ),
       extraQueryParameters: {
         domain_hint: "commonaad",

@@ -1,72 +1,87 @@
-import { auth } from "@/clients/authClient";
 import * as React from "react";
-import { useEffect, useContext } from "react";
+import { useEffect, useCallback } from "react";
+import { useMsal, useIsAuthenticated } from "@azure/msal-react";
+import { InteractionStatus } from "@azure/msal-browser";
 import { AuthProviderState } from "./AuthProvider.types";
+import { AccountContext } from "./useAccount";
+import type { AccountInfo } from "@azure/msal-browser";
+import { authConfig } from "@/config/msalConfig";
 
-export const useAccount = () => {
-  const account = useContext(Account);
-  if (!account) {
-    throw new Error("PartnerSettings not found");
-  }
-  return account;
-};
+type AuthProviderStateType = typeof AuthProviderState[keyof typeof AuthProviderState];
 
-const Account = React.createContext(null);
-Account.displayName = "PartnerSettings";
+interface AuthProviderProps {
+  render: (props: { account?: AccountInfo; state: AuthProviderStateType }) => React.ReactNode;
+}
 
-export const AuthProvider = (props) => {
-  const [authState, setAuthState] = React.useState(AuthProviderState.Loading);
-  const [account, setAccount] = React.useState();
+export const AuthProvider: React.FC<AuthProviderProps> = ({ render }) => {
+  const { instance, accounts, inProgress } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+  const [authState, setAuthState] = React.useState<AuthProviderStateType>(AuthProviderState.Loading);
+  const [account, setAccount] = React.useState<AccountInfo | undefined>();
 
-  useEffect(() => {
-    if (!props.msalClient) {
-      setAuthState(AuthProviderState.Error);
+  const performLogin = useCallback(async () => {
+    // Wait for any in-progress interactions to complete
+    if (inProgress !== InteractionStatus.None) {
       return;
     }
 
-    const login = async () => {
-      const accounts = props.msalClient.getAllAccounts();
+    try {
+      // Handle redirect promise first
+      const response = await instance.handleRedirectPromise();
 
-      if (
-        accounts &&
-        accounts.length > 0 &&
-        accounts[0].homeAccountId.includes(
-          auth.options.policies.signin.toLowerCase()
-        )
-      ) {
-        const accessToken = await auth.getAccessToken();
-        if (accessToken) {
-          setAccount(accounts[0]);
-          setAuthState(AuthProviderState.Success);
+      if (response) {
+        // User just completed authentication via redirect
+        setAccount(response.account);
+        setAuthState(AuthProviderState.Success);
+        return;
+      }
+
+      // Check if user is already logged in
+      if (isAuthenticated && accounts.length > 0) {
+        const existingAccount = accounts[0];
+
+        // Verify the account has the correct policy
+        if (
+          existingAccount.homeAccountId.includes(
+            authConfig.policies.signin.toLowerCase()
+          )
+        ) {
+          try {
+            // Try to get a token silently to verify the session
+            await instance.acquireTokenSilent({
+              account: existingAccount,
+              scopes: authConfig.scopes,
+            });
+            setAccount(existingAccount);
+            setAuthState(AuthProviderState.Success);
+            return;
+          } catch (err) {
+            console.error("Error getting access token:", err);
+          }
         } else {
-          setAuthState(AuthProviderState.Error);
-        }
-      } else {
-        const result = await auth.login();
-
-        if (result.error) {
-          setAuthState(AuthProviderState.Error);
-        } else if (result.account && result.accessToken) {
-          setAccount(result.account);
-          setAuthState(AuthProviderState.Success);
+          // Wrong policy, need to re-login
+          await instance.logout();
         }
       }
-    };
 
-    login();
-  }, []);
+      // No valid session, initiate login
+      await instance.loginRedirect({
+        scopes: authConfig.scopes,
+      });
+    } catch (error) {
+      console.error("Login failed:", error);
+      setAuthState(AuthProviderState.Error);
+    }
+  }, [instance, accounts, isAuthenticated, inProgress]);
 
-  if (!account) {
-    return (
-      <React.Fragment>
-        {props.render({ account, state: authState })}
-      </React.Fragment>
-    );
-  }
+  useEffect(() => {
+    performLogin();
+  }, [performLogin]);
 
+  // Render based on account state
   return (
-    <Account.Provider value={account}>
-      {props.render({ account, state: authState })}
-    </Account.Provider>
+    <AccountContext.Provider value={account || null}>
+      {render({ account, state: authState })}
+    </AccountContext.Provider>
   );
 };
