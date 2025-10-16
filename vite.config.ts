@@ -7,9 +7,10 @@ import path from "path";
 // https://vite.dev/config/
 export default defineConfig({
   server: {
-    allowedHosts: [
-      "ce5288ba-1a0d-441c-88e5-6135decae553-00-1fl9gpho5m8sl.pike.replit.dev",
-    ],
+    allowedHosts: ['.replit.dev', '.repl.run']
+  },
+  preview: {
+    allowedHosts: ['.replit.dev', '.repl.run']
   },
   resolve: {
     alias: {
