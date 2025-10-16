@@ -1,10 +1,16 @@
-// Auth action creators
-export const signoutAction = () => ({
-  type: 'AUTH_SIGNOUT',
-  payload: null,
-});
+export const signoutAction = () => {
+  return {
+    type: "SIGN_OUT",
+  };
+};
+export const tenantChangeAction = () => {
+  return {
+    type: "TENANT_CHANGE",
+  };
+};
 
-export const signinAction = (user: unknown) => ({
-  type: 'AUTH_SIGNIN',
-  payload: user,
-});
+export const instanceChangeAction = () => {
+  return {
+    type: "INSTANCE_CHANGE",
+  };
+};

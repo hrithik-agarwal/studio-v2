@@ -9,6 +9,7 @@ import PrimaryButton from "./components/PrimaryButton";
 import FullPageLoader from "./components/FullPageLoader";
 import MessageBlock from "./components/MessageBlock";
 import { AuthProvider, AuthProviderState } from "./providers";
+import Callback from "./components/Callback";
 
 // TODO: Import these components once they are created
 // import { Signup } from "@/features/auth/components/Signup";
@@ -21,8 +22,6 @@ const Signup = () => <div>Signup Page</div>;
 const VerifyEmail = () => <div>Verify Email Page</div>;
 const SkyPointLogin = () => <div>SkyPoint Login Page</div>;
 const SkypointSignUp = () => <div>Skypoint SignUp Page</div>;
-const AccountLocked = () => <div>🔒</div>;
-const Callback = () => <div>Callback Page</div>;
 const AppNew = () => <div>App New</div>;
 
 
@@ -85,7 +84,6 @@ const ApplicationBlock = () => {
   } else if (!data || !data.isSuccessful) {
     return (
       <MessageBlock>
-        <AccountLocked />
         <h3>Your account is locked. Contact support.</h3>
         <h4>
           Click here to{" "}

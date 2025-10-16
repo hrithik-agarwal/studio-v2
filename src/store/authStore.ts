@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
+import { create } from "zustand";
+import { devtools } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
 
 export interface IdTokenClaims {
   name?: string;
@@ -24,7 +24,9 @@ type AuthState = {
   // Actions
   setAuthenticated: (isAuthenticated: boolean) => void;
   setAccessToken: (token: string | undefined) => void;
-  setIdTokenClaims: (claims: IdTokenClaims | Record<string, any> | undefined) => void;
+  setIdTokenClaims: (
+    claims: IdTokenClaims | Record<string, any> | undefined
+  ) => void;
   setAuthData: (data: {
     isAuthenticated: boolean;
     accessToken?: string;
@@ -50,7 +52,9 @@ export const useAuthStore = create<AuthState>()(
           state.accessToken = token;
         }),
 
-      setIdTokenClaims: (claims: IdTokenClaims | Record<string, any> | undefined) =>
+      setIdTokenClaims: (
+        claims: IdTokenClaims | Record<string, any> | undefined
+      ) =>
         set((state) => {
           state.idTokenClaims = claims;
         }),
@@ -69,7 +73,7 @@ export const useAuthStore = create<AuthState>()(
           state.idTokenClaims = undefined;
         }),
     })),
-    { name: 'authStore' }
+    { name: "authStore" }
   )
 );
 

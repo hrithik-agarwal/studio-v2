@@ -130,7 +130,6 @@ class Auth {
   }
 
   async getAccessToken(scopes = null) {
-
     // Check if we already have an access token in store
     const authState = getAuthState();
     if (authState.accessToken) {
@@ -139,7 +138,6 @@ class Auth {
 
     try {
       const accounts = this.msalClient.getAllAccounts();
-     
 
       let tokenResponse = await this.msalClient.handleRedirectPromise();
       if (!tokenResponse) {
@@ -150,9 +148,7 @@ class Auth {
           });
           getAuthState().setAuthenticated(true);
         } catch (error) {
-
           if (error instanceof InteractionRequiredAuthError) {
-           
             await this.msalClient.acquireTokenRedirect({
               account: accounts[0],
               scopes: scopes ? scopes : authConfig.scopes,
@@ -322,7 +318,16 @@ class Auth {
     if (accounts && accounts.length > 0) {
       const account = accounts[0];
 
-      const idToken = getAuthState().idTokenClaims;
+      const authState = getAuthState();
+      if (!authState.idTokenClaims && account.idTokenClaims) {
+        getAuthState().setIdTokenClaims(account.idTokenClaims);
+      }
+
+      if (!authState.accessToken && account.idToken) {
+        getAuthState().setAccessToken(account.idToken);
+      }
+
+      const idToken = authState.idTokenClaims || account.idTokenClaims;
       if (idToken) {
         return {
           name: idToken.name,
@@ -341,11 +346,17 @@ class Auth {
       return {
         name: account.name,
         id: account.localAccountId,
-        isAccountEnabled : account.idTokenClaims ? account.idTokenClaims['account_Enabled'] : undefined
+        isAccountEnabled: account.idTokenClaims
+          ? account.idTokenClaims["account_Enabled"]
+          : undefined,
       };
     }
 
-    return undefined;
+    return {
+      name: null,
+      id: null,
+      isAccountEnabled: null,
+    };
   }
 }
 export const auth = new Auth();
