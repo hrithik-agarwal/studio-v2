@@ -31,3 +31,13 @@ dist-ssr
 *.sw?
 *.tanstack*
 .claude
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.p7b
+*.p7c
+*.der
