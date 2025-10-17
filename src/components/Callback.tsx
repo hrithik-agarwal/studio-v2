@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import FullPageLoader from "./FullPageLoader";
 import { ROUTES } from "@/libs";
 import { auth } from "@/clients";
-import NoAccessCard from "./NoAccessCard";
+import { NoAccessCard } from "./index";
 
 const Callback: React.FC = () => {
   const [isError, setIsError] = useState(false);
@@ -19,7 +19,7 @@ const Callback: React.FC = () => {
       headers: auth.getAuthorizationHeader(),
       body: JSON.stringify(userExistsRequest),
     })
-    //   .then(errorHandler)
+      //   .then(errorHandler)
       .then((response) => response.json())
       .then(
         (data) => {

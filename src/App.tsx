@@ -5,11 +5,14 @@ import { msalInstance } from "./config/msalConfig";
 import { auth } from "./clients/authClient";
 import type { IUserExistsResponse } from "@/store/appStore";
 import { ROUTES } from "./libs/constants";
-import PrimaryButton from "./components/PrimaryButton";
-import FullPageLoader from "./components/FullPageLoader";
-import MessageBlock from "./components/MessageBlock";
 import { AuthProvider, AuthProviderState } from "./providers";
-import Callback from "./components/Callback";
+import {
+  PrimaryButton,
+  FullPageLoader,
+  MessageBlock,
+  Callback,
+  MasterRoute
+} from "./components/index";
 
 // TODO: Import these components once they are created
 // import { Signup } from "@/features/auth/components/Signup";
@@ -22,15 +25,12 @@ const Signup = () => <div>Signup Page</div>;
 const VerifyEmail = () => <div>Verify Email Page</div>;
 const SkyPointLogin = () => <div>SkyPoint Login Page</div>;
 const SkypointSignUp = () => <div>Skypoint SignUp Page</div>;
-const AppNew = () => <div>App New</div>;
-
 
 // MSAL instance is now initialized in msalConfig.ts
 
 const Styles = {
   needHelpButton: {},
 };
-
 
 const getUser = async (): Promise<IUserExistsResponse> => {
   const user = auth.currentUser();
@@ -123,7 +123,7 @@ const ApplicationBlock = () => {
       <BrowserRouter>
         <Routes>
           <Route path={ROUTES.CALLBACK} element={<Callback />} />
-          <Route path="*" element={<AppNew />} />
+          <Route path="*" element={<MasterRoute />} />
         </Routes>
       </BrowserRouter>
     );
@@ -157,7 +157,11 @@ const App = () => {
     return (
       <MsalProvider instance={msalInstance}>
         <AuthProvider
-          render={({ state }: { state: typeof AuthProviderState[keyof typeof AuthProviderState] }) =>
+          render={({
+            state,
+          }: {
+            state: (typeof AuthProviderState)[keyof typeof AuthProviderState];
+          }) =>
             state === AuthProviderState.Success ? (
               <ApplicationBlock />
             ) : (
