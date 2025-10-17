@@ -32,5 +32,5 @@ dist-ssr
 *.tanstack*
 .claude
 # Certificates and keys
-localhost-key.pem
-localhost-cert.pem
+*localhost-key.pem*
+*localhost-cert.pem*
